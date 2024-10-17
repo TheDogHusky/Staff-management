@@ -1,6 +1,13 @@
 import Client from "./client";
 import { IActivityCheck } from "../utils";
-import {ActionRowBuilder, ButtonBuilder, EmbedBuilder, ButtonStyle, ButtonInteraction} from "discord.js";
+import {
+    ActionRowBuilder,
+    ButtonBuilder,
+    EmbedBuilder,
+    ButtonStyle,
+    ButtonInteraction,
+    TextBasedChannel
+} from "discord.js";
 
 export default class ActivityCheckManager {
     public client: Client;
@@ -28,9 +35,16 @@ export default class ActivityCheckManager {
                 const timeout = setTimeout(() => {
                     this.checkActivity(guild._id);
                 }, guild.checkInterval - interval);
-                this.checks.push({ timeout, guildId: guild._id });
+                let activityTimeout: NodeJS.Timeout | undefined;
+                if (Date.now() - guild.lastCheck > guild.checkTimeout) await this.handleTimeout(guild._id).catch(() => {});
+                else activityTimeout = setTimeout(() => {
+                    this.handleTimeout(guild._id);
+                });
+                this.checks.push({ timeout, guildId: guild._id, activityTimeout });
             }
         }
+
+        this.client.logger.info(`Fetched ${this.checks.length} activity checks.`, 'Activity Check Manager');
     }
 
     public async checkActivity(guildId: string): Promise<void> {
@@ -60,7 +74,7 @@ export default class ActivityCheckManager {
                 .setStyle(ButtonStyle.Primary)
             );
 
-        await channel.send({ embeds: [embed], components: [row], content: `<@&${guild.staffRole}>` });
+        const message = await channel.send({ embeds: [embed], components: [row], content: `<@&${guild.staffRole}>` });
 
         guild.lastCheck = Date.now();
         await guild.save();
@@ -71,7 +85,7 @@ export default class ActivityCheckManager {
         const activityTimeout = setTimeout(() => {
             this.handleTimeout(guildId);
         }, guild.checkTimeout);
-        this.checks.push({ timeout, guildId, activityTimeout });
+        this.checks.push({ timeout, guildId, activityTimeout, activityCheckMessageId: message.id });
     }
 
     public async handleInteraction(interaction: ButtonInteraction<"cached">): Promise<void> {
@@ -81,8 +95,7 @@ export default class ActivityCheckManager {
         const guild = await this.client.database.getGuild(interaction.guildId);
         if (!guild.isCheckEnabled) return;
         if (!member.roles.cache.has(guild.staffRole)) return;
-        if (Date.now() - guild.lastCheck < guild.checkTimeout) return;
-
+        if (Date.now() - guild.lastCheck < guild.checkTimeout) return; // If the timeout has already passed
         const channel = interaction.channel;
         if (!channel || !channel.isTextBased()) return;
 
@@ -124,6 +137,17 @@ export default class ActivityCheckManager {
         const check = this.checks.find((check) => check.guildId === guildId);
         if (check) {
             clearTimeout(check.activityTimeout);
+            const message = await (guildObject.channels.cache.get(guild.checkChannel) as TextBasedChannel)?.messages.fetch(check.activityCheckMessageId || '').catch(() => null);
+            if (message) {
+                const embed = new EmbedBuilder()
+                    .setTitle(`${this.client.config.emotes.error}・Activity Check Finished`)
+                    .setDescription(`> The activity check has finished.\n> ${inactiveStaffMembers.size} staff members have been removed.`)
+                    .setColor(this.client.config.colors.success)
+                    .setFooter({ text: `Activity Check`, iconURL: this.client.user?.displayAvatarURL() })
+                    .setTimestamp();
+                console.log(message)
+                await message.edit({ embeds: [embed], components: [] }).catch(() => {});
+            }
         }
     }
 

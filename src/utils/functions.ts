@@ -72,6 +72,9 @@ export async function confirm(message: string, ctx: ChatInputCommandInteraction<
 
     const filter = (interaction: any) => interaction.customId === 'confirm' || interaction.customId === 'cancel';
     const interaction = await ctx.channel?.awaitMessageComponent({ filter, time: 15000 });
-    if (!interaction) return false;
-    else return interaction.customId === 'confirm';
+    if (interaction && interaction.customId === 'confirm') {
+        await interaction.deferUpdate();
+        return true;
+    }
+    else return false;
 }

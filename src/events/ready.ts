@@ -19,6 +19,7 @@ export default class ReadyEvent extends Event {
         await wait('3s');
 
         await client.synchronizeCommands();
+        await client.acm.fetchChecks();
         return;
     };
 };

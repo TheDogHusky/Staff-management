@@ -45,4 +45,5 @@ export interface IActivityCheck {
     timeout: NodeJS.Timeout;
     activityTimeout?: NodeJS.Timeout;
     guildId: string;
+    activityCheckMessageId?: string;
 }

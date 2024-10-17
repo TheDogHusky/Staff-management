@@ -4,8 +4,7 @@ import {
     ActionRowBuilder,
     ApplicationCommand,
     ApplicationCommandResolvable,
-    ButtonBuilder, ButtonInteraction, ButtonStyle, ChatInputCommandInteraction,
-    Interaction
+    ButtonBuilder, ButtonStyle, ChatInputCommandInteraction
 } from 'discord.js';
 
 export function wait(time: number | string): Promise<void> {
